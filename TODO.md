@@ -167,9 +167,7 @@ Legend: [ ] not started · [~] in progress · [x] done
 - Current baseline numbers (SPY, corrected target, n=1230,
   2021-08-24..2026-07-22): QLIKE — naive 0.304, **har_rv 0.227 (best)**,
   garch11 0.399. Note MSE/MAE/R² disagree with the QLIKE ranking (R² is
-  negative for both naive and har_rv) — no Diebold-Mariano test exists yet
-  to back the QLIKE win as real skill vs. noise (CLAUDE.md §2.2); treat as
-  open until that test is run, likely alongside the §7 hybrid evaluation.
+  negative for both naive and har_rv).
 - **TimesFM 2.5 zero-shot** (`load_pretrained_timesfm()` implemented,
   `scripts/run_zeroshot_timesfm.py`, same evaluation window): QLIKE 0.248
   (close to HAR-RV's 0.227), and best of all four models on MSE
@@ -179,3 +177,16 @@ Legend: [ ] not started · [~] in progress · [x] done
   before fine-tuning") — zero-shot is competitive, so fine-tuning work
   (§5/§6) is justified to attempt next, pending the compute decision
   still open in §4/§8.
+- **Diebold-Mariano test implemented** (`src/eval/diebold_mariano.py`,
+  `scripts/run_dm_tests.py`, see `reports/dm_test_results.md`) — the QLIKE
+  claims above are now checked, not just point estimates:
+  - HAR-RV beats naive and GARCH(1,1) on QLIKE, and both differences are
+    statistically significant (p=1.4e-05, p≈0) — the "HAR-RV wins" claim
+    holds up.
+  - TimesFM zero-shot beats naive and GARCH(1,1) on QLIKE, both
+    significant (p=2.8e-05, p=5.1e-15).
+  - **HAR-RV vs. TimesFM zero-shot is NOT statistically significant**
+    (p=0.061 at the 5% threshold) — despite TimesFM's better point-estimate
+    R², the two models are statistically indistinguishable on QLIKE. Any
+    claim that either "wins" between these two specifically is unsupported
+    by this test; report both as tied on the primary metric.

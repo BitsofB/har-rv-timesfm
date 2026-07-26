@@ -91,6 +91,41 @@ def load_pretrained_timesfm(checkpoint: str = CHECKPOINT):
     return model
 
 
+def zeroshot_forecast(
+    rv: pd.Series,
+    min_train_size: int = 250,
+    context_length: int = 512,
+    horizon: int = 1,
+    model=None,
+) -> pd.Series:
+    """
+    Walk forward one step at a time: at index i, feed the model
+    rv[i-context_length+1 : i+1] (info through day i inclusive) and take
+    its 1-step-ahead point forecast as the prediction for day i+1 -- same
+    "key i = forecast for i+1" convention already used by rolling_har_rv /
+    naive_persistence / rolling_garch_11 in src/models/har_rv.py and
+    src/models/baselines.py.
+
+    Unlike those baselines, TimesFM is not refit per step (it's a
+    pretrained foundation model run zero-shot) -- only the context window
+    advances. Pass an already-loaded model to avoid reloading the
+    checkpoint across repeated calls (e.g. one comparison script running
+    this alongside the other baselines).
+    """
+    if model is None:
+        model = load_pretrained_timesfm()
+
+    contexts, idxs = [], []
+    n = len(rv)
+    for i in range(min_train_size, n):
+        start = max(0, i - context_length + 1)
+        contexts.append(rv.values[start:i + 1].astype("float32"))
+        idxs.append(rv.index[i])
+
+    point_forecast, _ = model.forecast(horizon=horizon, inputs=contexts)
+    return pd.Series(point_forecast[:, 0], index=idxs, name="timesfm_zeroshot_pred")
+
+
 def fine_tune(
     model,
     train_windows: tuple[np.ndarray, np.ndarray],
@@ -125,7 +160,12 @@ def fine_tune(
 
 def forecast_residuals(model, context: np.ndarray) -> np.ndarray:
     """Run inference: context window -> next-step residual forecast."""
-    raise NotImplementedError
+    raise NotImplementedError(
+        "Fine-tuned residual inference isn't wired up yet -- fine_tune() "
+        "above hasn't been implemented either (TODO.md step 6). Use "
+        "zeroshot_forecast() for the zero-shot-on-raw-RV pass (TODO.md "
+        "step 4); this function is for the post-fine-tuning residual path."
+    )
 
 
 def assemble_hybrid_forecast(

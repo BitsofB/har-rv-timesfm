@@ -20,8 +20,7 @@ from src.eval.baseline_report import compute_baseline_metrics, write_baseline_re
 from src.features.data_alpaca import fetch_intraday_bars
 from src.features.data_cleaning import flag_bad_days, reindex_to_grid, session_grid
 from src.features.realized_vol import build_feature_table, daily_close_returns
-from src.models.baselines import naive_persistence, rolling_garch_11
-from src.models.har_rv import rolling_har_rv
+from src.models.baselines import fit_naive_har_garch
 
 EXPECTED_BARS_PER_DAY = 78  # 6.5h regular session / 5-min bars
 
@@ -49,23 +48,16 @@ def main(symbol: str, start: str, end: str, min_train_size: int = 250) -> None:
     Path("data/processed").mkdir(parents=True, exist_ok=True)
     feats.to_parquet(f"data/processed/{symbol}_features.parquet")
 
-    target = feats["rv_d"].shift(-1).dropna().rename("target")
-    features_aligned = feats.loc[target.index]
-    daily_ret_aligned = daily_ret.loc[daily_ret.index.intersection(target.index)]
-
-    har = rolling_har_rv(features_aligned[["rv_d", "rv_w", "rv_m"]], target, min_train_size)
-    naive = naive_persistence(features_aligned, min_train_size)
-    garch = rolling_garch_11(daily_ret_aligned, min_train_size)
+    target, predictions = fit_naive_har_garch(feats, daily_ret, min_train_size)
 
     common_idx = (
-        har.predictions.index
-        .intersection(naive.predictions.index)
-        .intersection(garch.predictions.index)
+        predictions["har_rv"].index
+        .intersection(predictions["naive"].index)
+        .intersection(predictions["garch11"].index)
     )
     metrics = compute_baseline_metrics({
-        "naive": (target.loc[common_idx], naive.predictions.loc[common_idx]),
-        "har_rv": (target.loc[common_idx], har.predictions.loc[common_idx]),
-        "garch11": (target.loc[common_idx], garch.predictions.loc[common_idx]),
+        name: (target.loc[common_idx], preds.loc[common_idx])
+        for name, preds in predictions.items()
     })
 
     if bad_days:

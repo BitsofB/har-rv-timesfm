@@ -21,35 +21,7 @@ import argparse
 import pandas as pd
 
 from src.eval.baseline_report import compute_baseline_metrics, write_baseline_report
-from src.models.timesfm_finetune import load_pretrained_timesfm
-
-
-def zeroshot_forecasts(
-    rv: pd.Series,
-    min_train_size: int = 250,
-    context_length: int = 512,
-    horizon: int = 1,
-) -> pd.Series:
-    """
-    Walk forward one step at a time: at index i, feed the model rv[i-context_length+1 : i+1]
-    (info through day i inclusive) and take its 1-step-ahead point forecast as
-    the prediction for day i+1 -- same "key i = forecast for i+1" convention
-    already used by rolling_har_rv/naive_persistence/rolling_garch_11.
-
-    Unlike those baselines, TimesFM is not refit per step (it's a pretrained
-    foundation model run zero-shot) -- only the context window advances.
-    """
-    model = load_pretrained_timesfm()
-
-    contexts, idxs = [], []
-    n = len(rv)
-    for i in range(min_train_size, n):
-        start = max(0, i - context_length + 1)
-        contexts.append(rv.values[start:i + 1].astype("float32"))
-        idxs.append(rv.index[i])
-
-    point_forecast, _ = model.forecast(horizon=horizon, inputs=contexts)
-    return pd.Series(point_forecast[:, 0], index=idxs, name="timesfm_zeroshot_pred")
+from src.models.timesfm_finetune import zeroshot_forecast
 
 
 def main(symbol: str, min_train_size: int = 250, context_length: int = 512) -> None:
@@ -57,7 +29,7 @@ def main(symbol: str, min_train_size: int = 250, context_length: int = 512) -> N
     rv = feats["rv_d"]
     target = rv.shift(-1).dropna().rename("target")
 
-    zeroshot_preds = zeroshot_forecasts(rv, min_train_size, context_length)
+    zeroshot_preds = zeroshot_forecast(rv, min_train_size, context_length)
 
     common_idx = target.index.intersection(zeroshot_preds.index)
     metrics = compute_baseline_metrics({
