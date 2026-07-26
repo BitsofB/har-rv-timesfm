@@ -67,10 +67,20 @@ Legend: [ ] not started · [~] in progress · [x] done
 - [x] Compare zero-shot TimesFM vs HAR-RV vs GARCH on same test window —
       done, see `reports/zeroshot_timesfm_metrics.md` vs
       `reports/baseline_metrics.md`
-- [ ] **Compute for fine-tuning is still an open question** (deferred — not
-      yet decided whether local Mac mini M4, cloud GPU, or something else;
-      revisit before starting step 6 in earnest — zero-shot pass above can
-      run on CPU/MPS regardless)
+- [x] **Compute decision (2026-07-26): local Mac mini M4, not cloud GPU.**
+      Residual construction (§5) gives ~1,230 daily observations for one
+      asset — a LoRA adapter on a 200M-param model trains in minutes to
+      low hours on data this size, not the multi-day runs that justify
+      renting a GPU; LoRA's memory footprint is dominated by activations
+      through the frozen base model, well within M4 unified memory. The
+      M4 is also the machine that already has HF Hub access, Alpaca
+      access, and a verified `timesfm[torch,xreg]` install (the zero-shot
+      pass above ran here). Risk: MPS has historically had gaps for some
+      PEFT/attention kernels — mitigation is to run the LoRA loop on a
+      tiny data slice (~100 steps) first; if MPS throws an unsupported-op
+      error, set `PYTORCH_ENABLE_MPS_FALLBACK=1` (runs that op on CPU)
+      before escalating to cloud. Revisit only if that fallback makes
+      training impractically slow.
 
 ## 5. Residual construction for hybrid
 - [ ] Generate HAR-RV rolling out-of-sample predictions across full history
