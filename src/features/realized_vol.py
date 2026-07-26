@@ -36,6 +36,26 @@ def jump_component(rv: pd.Series, bv: pd.Series) -> pd.Series:
     return (rv - bv).clip(lower=0)
 
 
+def daily_signed_semivariance(intraday_returns: pd.Series) -> pd.DataFrame:
+    """
+    Split RV into upside/downside components (Barndorff-Nielsen, Kinnebrock
+    & Shephard 2010): RV_t = RV_pos_t + RV_neg_t.
+    """
+    pos = intraday_returns.clip(lower=0).pow(2)
+    neg = intraday_returns.clip(upper=0).pow(2)
+    return pd.DataFrame({
+        "rv_pos": pos.groupby(intraday_returns.index.date).sum(),
+        "rv_neg": neg.groupby(intraday_returns.index.date).sum(),
+    })
+
+
+def daily_close_returns(prices: pd.Series) -> pd.Series:
+    """Close-to-close daily log returns (for GARCH, not RV)."""
+    daily_close = prices.groupby(prices.index.date).last()
+    daily_close.index = pd.to_datetime(daily_close.index)
+    return np.log(daily_close).diff().dropna()
+
+
 def har_lag_features(rv: pd.Series) -> pd.DataFrame:
     """
     Build the three HAR regressors: daily, weekly (5d avg), monthly (22d avg).
