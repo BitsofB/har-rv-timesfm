@@ -58,17 +58,57 @@ Legend: [ ] not started · [~] in progress · [x] done
       `reports/baseline_metrics.md`
 
 ## 4. TimesFM integration — zero-shot pass first
-- [ ] Install `timesfm[torch,xreg]` (2.5, see pinned version in step 0),
+- [x] Install `timesfm[torch,xreg]` (2.5, see pinned version in step 0),
       verify `load_pretrained_timesfm()` in src/models/timesfm_finetune.py
-      actually loads and runs inference
+      actually loads and runs inference — **partially done, see caveat
+      below**: `load_pretrained_timesfm()` is implemented for real (no
+      longer a stub) and matches the installed `timesfm==2.0.2` API
+      exactly (`TimesFM_2p5_200M_torch.from_pretrained` /
+      `.compile(ForecastConfig(...))`), verified by import + signature
+      inspection. `rolling_zero_shot_forecast()` / `forecast_residuals()`
+      are implemented and unit-tested (17→23 tests passing, including a
+      leakage/indexing check against a fake model — see
+      `tests/models/test_timesfm_finetune.py`).
 - [ ] Run TimesFM zero-shot directly on raw RV series (no HAR involved) as a
-      sanity baseline — confirms whether foundation model adds value at all
-      before investing in fine-tuning
+      sanity baseline — **NOT actually executed against the real checkpoint
+      or real SPY data yet.** `scripts/run_zeroshot_timesfm.py` is written
+      and its plumbing verified end-to-end against synthetic data + a fake
+      model, but the dev sandbox this was built in has a restrictive
+      outbound proxy allowlist: `huggingface.co` (and `hf.co`,
+      `cdn-lfs.huggingface.co`, `hf-mirror.com`) and Alpaca's
+      `data.alpaca.markets` all returned 403 from the proxy — only
+      `pypi.org`/`files.pythonhosted.org` and `github.com` were reachable.
+      That means neither the TimesFM checkpoint nor fresh Alpaca data could
+      be pulled in that environment. **Run `scripts/run_zeroshot_timesfm.py`
+      somewhere with both HF Hub and Alpaca network access (e.g. locally)
+      to get the real number** — treat that first real run as the actual
+      completion of this checkbox, not this one.
 - [ ] Compare zero-shot TimesFM vs HAR-RV vs GARCH on same test window
+      (blocked on the above — `reports/zeroshot_timesfm_metrics.md` will be
+      written by the script once it runs somewhere with network access;
+      compare its QLIKE against `reports/baseline_metrics.md`'s `har_rv`
+      row directly, they're intentionally two separate files)
 - [ ] **Compute for fine-tuning is still an open question** (deferred — not
       yet decided whether local Mac mini M4, cloud GPU, or something else;
       revisit before starting step 6 in earnest — zero-shot pass above can
-      run on CPU/MPS regardless)
+      run on CPU/MPS regardless, but needs a network-unrestricted
+      environment per the caveat above, e.g. the Mac mini M4 rather than
+      this cloud sandbox)
+
+### Note (2026-07-26, zero-shot scaffolding session)
+- Installed `timesfm==2.0.2` with the `torch` extra only (skipped `xreg`,
+  which pulls `jax[cuda]` — unnecessary for a zero-shot pass with no
+  covariates, and this sandbox is CPU-only aarch64 anyway).
+- The default PyPI `torch==2.13.0` wheel for aarch64 turned out to
+  hard-require dynamically-linked CUDA runtime libraries at import time
+  (`libcublasLt.so` etc.) even for CPU-only use — no genuine CPU-only
+  aarch64 wheel exists on PyPI for that version; `download.pytorch.org`
+  (which hosts real `+cpu` wheels) was blocked by the proxy. Worked around
+  it by pinning `torch==2.5.0`, whose aarch64 PyPI wheel (~92MB, vs 427MB
+  for 2.13.0) is genuinely CPU-only and satisfies `timesfm`'s `torch>=2.0.0`
+  constraint. If revisiting in an unrestricted environment, either pin is
+  fine — this note is only relevant if you hit the same `libcublasLt.so`
+  import error.
 
 ## 5. Residual construction for hybrid
 - [ ] Generate HAR-RV rolling out-of-sample predictions across full history

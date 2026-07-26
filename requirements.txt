@@ -19,6 +19,12 @@ pandas-market-calendars
 arch          # GARCH/EGARCH models
 
 # TimesFM 2.5 — https://github.com/google-research/timesfm
+# NOTE: `xreg` pulls jax[cuda], which is unneeded for the zero-shot pass
+# (no covariates yet) and heavy to install on a CPU-only box; install
+# `timesfm[torch]` only until step 6 (covariates) actually needs xreg.
+# Also: on aarch64, PyPI's default torch wheel requires CUDA runtime libs
+# at import time even for CPU use — pin torch<2.6 or grab a genuine
+# +cpu wheel from download.pytorch.org if you hit `libcublasLt.so` errors.
 timesfm[torch,xreg]
 peft          # LoRA fine-tuning (official TimesFM fine-tuning path)
 transformers  # required by the HF Transformers + PEFT fine-tuning example
