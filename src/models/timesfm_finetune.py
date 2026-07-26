@@ -69,34 +69,26 @@ def load_pretrained_timesfm(checkpoint: str = CHECKPOINT):
     """
     Load the pretrained TimesFM 2.5 checkpoint for zero-shot inference
     (step 4) or as the base model to wrap with a LoRA adapter (step 6).
-
-        import torch
-        import timesfm
-
-        torch.set_float32_matmul_precision("high")
-        model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(checkpoint)
-        model.compile(
-            timesfm.ForecastConfig(
-                max_context=1024,       # our RV series won't need the 16k max
-                max_horizon=1,          # 1-step-ahead, matching HAR
-                normalize_inputs=True,
-                use_continuous_quantile_head=False,  # True if quantile_loss
-                force_flip_invariance=True,
-                infer_is_positive=True,  # RV/residuals-of-variance are >= 0-ish;
-                                          # reconsider if fine-tuning on raw
-                                          # (signed) residuals rather than |resid|
-                fix_quantile_crossing=True,
-            )
-        )
-        return model
-
-    NotImplementedError left in place until `timesfm[torch,xreg]` is actually
-    installed in this environment and the call above is verified to run.
     """
-    raise NotImplementedError(
-        "Install timesfm[torch,xreg] and verify the load call above runs "
-        "(TODO.md step 0/4) before removing this guard."
+    import torch
+    import timesfm
+
+    torch.set_float32_matmul_precision("high")
+    model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(checkpoint)
+    model.compile(
+        timesfm.ForecastConfig(
+            max_context=1024,       # our RV series won't need the 16k max
+            max_horizon=1,          # 1-step-ahead, matching HAR
+            normalize_inputs=True,
+            use_continuous_quantile_head=False,  # True if quantile_loss
+            force_flip_invariance=True,
+            infer_is_positive=True,  # RV/residuals-of-variance are >= 0-ish;
+                                      # reconsider if fine-tuning on raw
+                                      # (signed) residuals rather than |resid|
+            fix_quantile_crossing=True,
+        )
     )
+    return model
 
 
 def fine_tune(
