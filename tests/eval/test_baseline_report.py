@@ -24,3 +24,22 @@ def test_write_baseline_report_writes_markdown_table(tmp_path):
     content = out_path.read_text()
     assert "qlike" in content
     assert "perfect" in content
+
+
+def test_write_baseline_report_creates_nested_directories(tmp_path):
+    """Verify that write_baseline_report creates parent directories if they don't exist."""
+    metrics = compute_baseline_metrics({
+        "perfect": (pd.Series([1.0, 2.0]), pd.Series([1.0, 2.0])),
+    })
+    nested_path = tmp_path / "nested" / "subdir" / "baseline_metrics.md"
+
+    # nested/subdir/ doesn't exist yet
+    assert not nested_path.parent.exists()
+
+    write_baseline_report(metrics, out_path=str(nested_path))
+
+    # Verify the file was created and contains expected content
+    assert nested_path.exists()
+    content = nested_path.read_text()
+    assert "qlike" in content
+    assert "perfect" in content

@@ -4,6 +4,8 @@ it to reports/baseline_metrics.md -- required before any fine-tuning work
 starts (CLAUDE.md section 3).
 """
 
+import os
+
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
@@ -28,6 +30,7 @@ def compute_baseline_metrics(predictions: dict) -> pd.DataFrame:
 
 
 def write_baseline_report(metrics: pd.DataFrame, out_path: str = "reports/baseline_metrics.md") -> None:
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     with open(out_path, "w") as f:
         f.write("# Baseline metrics\n\n")
         f.write(metrics.to_markdown())
