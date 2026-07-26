@@ -83,14 +83,22 @@ Legend: [ ] not started · [~] in progress · [x] done
       training impractically slow.
 
 ## 5. Residual construction for hybrid
-- [ ] Generate HAR-RV rolling out-of-sample predictions across full history
+- [x] Generate HAR-RV rolling out-of-sample predictions across full history
       (not in-sample fitted values — must match the leakage-safe re-estimation
-      scheme from step 3)
-- [ ] Compute residual series: `resid_t = RV_t - HAR_pred_t`
-- [ ] Check residual stationarity / remaining autocorrelation (confirms HAR
+      scheme from step 3) — `scripts/build_residuals.py`
+- [x] Compute residual series: `resid_t = RV_t - HAR_pred_t` — same script,
+      saved to `data/processed/{symbol}_residuals.parquet`
+- [x] Check residual stationarity / remaining autocorrelation (confirms HAR
       hasn't already captured everything, i.e. there's signal left for the NN)
-- [ ] Build supervised windows (context window → next-step residual) for
-      TimesFM fine-tuning input format
+      — see `reports/residual_diagnostics.md`: stationary (ADF p=1.1e-29)
+      **and** significant remaining autocorrelation (Ljung-Box p≈2e-50 at
+      lag 10) — real exploitable structure is left, justifies fine-tuning
+- [x] Build supervised windows (context window → next-step residual) for
+      TimesFM fine-tuning input format — `build_windows()` in
+      `src/models/timesfm_finetune.py`, smoke-tested on the full residual
+      series (context_length=60 -> X.shape=(1170,60), y.shape=(1170,1));
+      the real train/val/test split + embargo gap (step 6) must happen
+      BEFORE windowing on those splits, not on this full-series smoke test
 
 ## 6. Fine-tuning TimesFM (main focus)
 - [ ] Define fine-tuning objective: forecast `resid_t+1` (point) — decide
