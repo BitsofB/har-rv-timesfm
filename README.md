@@ -45,4 +45,4 @@ reports/          # write-ups, benchmark tables, plots
 
 ## Status
 
-See (`TODO.md`)[~/TODO.md] for the working task list (current focus: fine-tuning stage).
+See [`TODO.md`](TODO.md) for the working task list (current focus: fine-tuning stage).
