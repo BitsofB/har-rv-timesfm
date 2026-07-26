@@ -41,9 +41,9 @@ def rolling_garch_11(
 
     for i in range(min_train_size, n):
         if window == "expanding":
-            train = daily_returns.iloc[:i]
+            train = daily_returns.iloc[:i + 1]
         else:
-            train = daily_returns.iloc[max(0, i - rolling_size):i]
+            train = daily_returns.iloc[max(0, i + 1 - rolling_size):i + 1]
 
         # arch_model wants returns scaled to roughly O(1) percent for
         # numerically stable optimization
