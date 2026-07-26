@@ -58,13 +58,15 @@ Legend: [ ] not started · [~] in progress · [x] done
       `reports/baseline_metrics.md`
 
 ## 4. TimesFM integration — zero-shot pass first
-- [ ] Install `timesfm[torch,xreg]` (2.5, see pinned version in step 0),
+- [x] Install `timesfm[torch,xreg]` (2.5, see pinned version in step 0),
       verify `load_pretrained_timesfm()` in src/models/timesfm_finetune.py
-      actually loads and runs inference
-- [ ] Run TimesFM zero-shot directly on raw RV series (no HAR involved) as a
+      actually loads and runs inference — done, see note below
+- [x] Run TimesFM zero-shot directly on raw RV series (no HAR involved) as a
       sanity baseline — confirms whether foundation model adds value at all
-      before investing in fine-tuning
-- [ ] Compare zero-shot TimesFM vs HAR-RV vs GARCH on same test window
+      before investing in fine-tuning — done, see note below
+- [x] Compare zero-shot TimesFM vs HAR-RV vs GARCH on same test window —
+      done, see `reports/zeroshot_timesfm_metrics.md` vs
+      `reports/baseline_metrics.md`
 - [ ] **Compute for fine-tuning is still an open question** (deferred — not
       yet decided whether local Mac mini M4, cloud GPU, or something else;
       revisit before starting step 6 in earnest — zero-shot pass above can
@@ -152,3 +154,28 @@ Legend: [ ] not started · [~] in progress · [x] done
   if a longer backtest window (e.g. for the 2020 COVID stress-window
   ablation in CLAUDE.md §6) is needed — may require a different data
   source/tier for the pre-2020-07 period.
+
+## Note (2026-07-26, RV-target fix + TimesFM zero-shot pass)
+- **RV target was contaminated by the overnight (prev-close-to-open) return**:
+  `intraday_log_returns`/`daily_bipower_variation` diffed/shifted across day
+  boundaries, inflating reported RV by ~1.6x on average (up to >50% of a
+  day's "realized volatility" on some sessions). Fixed to diff/shift within
+  each session only (`src/features/realized_vol.py`); `reports/baseline_metrics.md`
+  regenerated with the corrected target. Not a leakage bug (the gap is known
+  at time t), but the target definition was wrong — every earlier number
+  produced before this fix is stale.
+- Current baseline numbers (SPY, corrected target, n=1230,
+  2021-08-24..2026-07-22): QLIKE — naive 0.304, **har_rv 0.227 (best)**,
+  garch11 0.399. Note MSE/MAE/R² disagree with the QLIKE ranking (R² is
+  negative for both naive and har_rv) — no Diebold-Mariano test exists yet
+  to back the QLIKE win as real skill vs. noise (CLAUDE.md §2.2); treat as
+  open until that test is run, likely alongside the §7 hybrid evaluation.
+- **TimesFM 2.5 zero-shot** (`load_pretrained_timesfm()` implemented,
+  `scripts/run_zeroshot_timesfm.py`, same evaluation window): QLIKE 0.248
+  (close to HAR-RV's 0.227), and best of all four models on MSE
+  (1.69e-08), MAE (0.000033), and R² (0.260 — the only meaningfully
+  positive R² among naive/har_rv/garch11/timesfm_zeroshot). This clears
+  the CLAUDE.md §2.3/§4 bar ("if zero-shot can't get near HAR-RV, say so
+  before fine-tuning") — zero-shot is competitive, so fine-tuning work
+  (§5/§6) is justified to attempt next, pending the compute decision
+  still open in §4/§8.
