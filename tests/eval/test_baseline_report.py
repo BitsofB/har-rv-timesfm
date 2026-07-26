@@ -26,6 +26,34 @@ def test_write_baseline_report_writes_markdown_table(tmp_path):
     assert "perfect" in content
 
 
+def test_write_baseline_report_writes_notes_when_provided(tmp_path):
+    metrics = compute_baseline_metrics({
+        "perfect": (pd.Series([1.0, 2.0]), pd.Series([1.0, 2.0])),
+    })
+    out_path = tmp_path / "baseline_metrics.md"
+    notes = "## Notes\n\nData feed: Alpaca IEX, not SIP consolidated tape."
+
+    write_baseline_report(metrics, out_path=str(out_path), notes=notes)
+
+    content = out_path.read_text()
+    assert "qlike" in content
+    assert notes in content
+
+
+def test_write_baseline_report_omits_notes_section_when_not_provided(tmp_path):
+    """No notes arg (or None) must behave exactly as before -- no regression."""
+    metrics = compute_baseline_metrics({
+        "perfect": (pd.Series([1.0, 2.0]), pd.Series([1.0, 2.0])),
+    })
+    out_path = tmp_path / "baseline_metrics.md"
+
+    write_baseline_report(metrics, out_path=str(out_path))
+
+    content = out_path.read_text()
+    expected = "# Baseline metrics\n\n" + metrics.to_markdown() + "\n"
+    assert content == expected
+
+
 def test_write_baseline_report_creates_nested_directories(tmp_path):
     """Verify that write_baseline_report creates parent directories if they don't exist."""
     metrics = compute_baseline_metrics({

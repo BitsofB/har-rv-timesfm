@@ -22,9 +22,11 @@ Legend: [ ] not started · [~] in progress · [x] done
 - [x] Pull intraday minute-bar data for target asset(s) via Alpaca (start with
       1 liquid equity index ETF or large-cap name before multi-asset)
 - [x] Handle exchange calendar / trading-hours filtering, holidays, half-days
-- [x] Clean microstructure noise (bad ticks, crossed quotes, outliers) — IEX
-      feed is a single venue so likely cleaner than consolidated tape, but
-      still check for gaps/stale bars
+- [x] Detect gaps/missing bars via the session grid (`flag_bad_days` /
+      `reindex_to_grid` in `src/features/data_cleaning.py`) — NOTE: this is
+      gap detection only. Bad-tick / crossed-quote / outlier detection is
+      NOT implemented anywhere in `src/` and remains a gap; IEX being a
+      single venue makes this lower-priority but it's still unaddressed.
 - [x] Resample to fixed intraday grid (e.g. 5-min) for RV estimation
 - [x] Store cleaned intraday data in `data/raw/`
 - [ ] (Optional) Pull Alpha Vantage fundamentals/economic-indicator data as

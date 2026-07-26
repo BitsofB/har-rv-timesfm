@@ -12,8 +12,15 @@ import pandas as pd
 
 
 def intraday_log_returns(prices: pd.Series) -> pd.Series:
-    """Log returns within a trading day at the resampled grid frequency."""
-    return np.log(prices).diff().dropna()
+    """Log returns within a trading day at the resampled grid frequency.
+
+    Diffs are taken per-session (grouped by calendar date) so the first
+    return of each trading day is dropped rather than computed against the
+    previous session's last price -- that cross-session diff is an overnight
+    return, not an intraday one, and squaring it into RV would contaminate
+    the target with overnight gap variance.
+    """
+    return np.log(prices).groupby(prices.index.date).diff().dropna()
 
 
 def daily_realized_variance(intraday_returns: pd.Series) -> pd.Series:
@@ -27,7 +34,7 @@ def daily_bipower_variation(intraday_returns: pd.Series) -> pd.Series:
     BV_t = (pi/2) * sum(|r_i| * |r_{i-1}|)
     """
     abs_r = intraday_returns.abs()
-    prod = abs_r * abs_r.shift(1)
+    prod = abs_r * abs_r.groupby(intraday_returns.index.date).shift(1)
     return (np.pi / 2) * prod.groupby(intraday_returns.index.date).sum()
 
 

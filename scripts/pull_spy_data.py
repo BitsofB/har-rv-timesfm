@@ -8,7 +8,11 @@ Requires ALPACA_API_KEY / ALPACA_SECRET_KEY in the environment. Run:
 """
 
 import argparse
+import sys
 from datetime import datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
 
@@ -36,11 +40,13 @@ def main(symbol: str, start: str, end: str, min_train_size: int = 250) -> None:
         keep = ~pd.Series(reindexed.index.date, index=reindexed.index).isin(bad_days)
         reindexed = reindexed[keep]
 
+    Path("data/raw").mkdir(parents=True, exist_ok=True)
     reindexed.to_parquet(f"data/raw/{symbol}_5min.parquet")
 
     prices = reindexed["close"].dropna()
     feats = build_feature_table(prices)
     daily_ret = daily_close_returns(prices)
+    Path("data/processed").mkdir(parents=True, exist_ok=True)
     feats.to_parquet(f"data/processed/{symbol}_features.parquet")
 
     target = feats["rv_d"].shift(-1).dropna().rename("target")
@@ -61,7 +67,32 @@ def main(symbol: str, start: str, end: str, min_train_size: int = 250) -> None:
         "har_rv": (target.loc[common_idx], har.predictions.loc[common_idx]),
         "garch11": (target.loc[common_idx], garch.predictions.loc[common_idx]),
     })
-    write_baseline_report(metrics)
+
+    if bad_days:
+        excluded_range = f"{min(bad_days)} to {max(bad_days)}"
+    else:
+        excluded_range = "none"
+
+    notes = (
+        "## Notes\n\n"
+        "- **Data feed**: Alpaca free tier, IEX feed (a single venue), not the "
+        "full consolidated SIP tape. Absolute RV magnitudes here are not "
+        "directly comparable to published academic figures built on "
+        "TAQ/SIP data.\n"
+        f"- **Evaluation window**: {common_idx.min().date()} to "
+        f"{common_idx.max().date()} (n={len(common_idx)} sessions).\n"
+        f"- **Excluded sessions**: {len(bad_days)} session(s) dropped by "
+        f"`flag_bad_days` for excessive missing intraday bars, spanning "
+        f"{excluded_range}.\n"
+        "- **GARCH(1,1) caveat**: `garch11` forecasts the conditional "
+        "variance of close-to-close *daily* returns, not intraday realized "
+        "variance. It's included as a standard volatility baseline for "
+        "comparison, not because its target matches `naive`/`har_rv` "
+        "exactly -- treat cross-model comparisons involving `garch11` with "
+        "that in mind.\n"
+    )
+
+    write_baseline_report(metrics, notes=notes)
     print(metrics)
 
 

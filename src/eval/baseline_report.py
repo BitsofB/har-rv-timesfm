@@ -29,9 +29,17 @@ def compute_baseline_metrics(predictions: dict) -> pd.DataFrame:
     return pd.DataFrame(rows).set_index("model")[["qlike", "mse", "mae", "r2"]]
 
 
-def write_baseline_report(metrics: pd.DataFrame, out_path: str = "reports/baseline_metrics.md") -> None:
+def write_baseline_report(
+    metrics: pd.DataFrame,
+    out_path: str = "reports/baseline_metrics.md",
+    notes: str | None = None,
+) -> None:
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     with open(out_path, "w") as f:
         f.write("# Baseline metrics\n\n")
         f.write(metrics.to_markdown())
         f.write("\n")
+        if notes:
+            f.write("\n")
+            f.write(notes)
+            f.write("\n")
