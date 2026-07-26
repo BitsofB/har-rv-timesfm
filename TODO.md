@@ -58,17 +58,29 @@ Legend: [ ] not started · [~] in progress · [x] done
       `reports/baseline_metrics.md`
 
 ## 4. TimesFM integration — zero-shot pass first
-- [ ] Install `timesfm[torch,xreg]` (2.5, see pinned version in step 0),
+- [x] Install `timesfm[torch,xreg]` (2.5, see pinned version in step 0),
       verify `load_pretrained_timesfm()` in src/models/timesfm_finetune.py
-      actually loads and runs inference
-- [ ] Run TimesFM zero-shot directly on raw RV series (no HAR involved) as a
+      actually loads and runs inference — done, see note below
+- [x] Run TimesFM zero-shot directly on raw RV series (no HAR involved) as a
       sanity baseline — confirms whether foundation model adds value at all
-      before investing in fine-tuning
-- [ ] Compare zero-shot TimesFM vs HAR-RV vs GARCH on same test window
-- [ ] **Compute for fine-tuning is still an open question** (deferred — not
-      yet decided whether local Mac mini M4, cloud GPU, or something else;
-      revisit before starting step 6 in earnest — zero-shot pass above can
-      run on CPU/MPS regardless)
+      before investing in fine-tuning — done, see note below
+- [x] Compare zero-shot TimesFM vs HAR-RV vs GARCH on same test window —
+      done, see `reports/zeroshot_timesfm_metrics.md` vs
+      `reports/baseline_metrics.md`
+- [x] **Compute decision (2026-07-26): local Mac mini M4, not cloud GPU.**
+      Residual construction (§5) gives ~1,230 daily observations for one
+      asset — a LoRA adapter on a 200M-param model trains in minutes to
+      low hours on data this size, not the multi-day runs that justify
+      renting a GPU; LoRA's memory footprint is dominated by activations
+      through the frozen base model, well within M4 unified memory. The
+      M4 is also the machine that already has HF Hub access, Alpaca
+      access, and a verified `timesfm[torch,xreg]` install (the zero-shot
+      pass above ran here). Risk: MPS has historically had gaps for some
+      PEFT/attention kernels — mitigation is to run the LoRA loop on a
+      tiny data slice (~100 steps) first; if MPS throws an unsupported-op
+      error, set `PYTORCH_ENABLE_MPS_FALLBACK=1` (runs that op on CPU)
+      before escalating to cloud. Revisit only if that fallback makes
+      training impractically slow.
 
 ## 5. Residual construction for hybrid
 - [ ] Generate HAR-RV rolling out-of-sample predictions across full history
@@ -152,3 +164,39 @@ Legend: [ ] not started · [~] in progress · [x] done
   if a longer backtest window (e.g. for the 2020 COVID stress-window
   ablation in CLAUDE.md §6) is needed — may require a different data
   source/tier for the pre-2020-07 period.
+
+## Note (2026-07-26, RV-target fix + TimesFM zero-shot pass)
+- **RV target was contaminated by the overnight (prev-close-to-open) return**:
+  `intraday_log_returns`/`daily_bipower_variation` diffed/shifted across day
+  boundaries, inflating reported RV by ~1.6x on average (up to >50% of a
+  day's "realized volatility" on some sessions). Fixed to diff/shift within
+  each session only (`src/features/realized_vol.py`); `reports/baseline_metrics.md`
+  regenerated with the corrected target. Not a leakage bug (the gap is known
+  at time t), but the target definition was wrong — every earlier number
+  produced before this fix is stale.
+- Current baseline numbers (SPY, corrected target, n=1230,
+  2021-08-24..2026-07-22): QLIKE — naive 0.304, **har_rv 0.227 (best)**,
+  garch11 0.399. Note MSE/MAE/R² disagree with the QLIKE ranking (R² is
+  negative for both naive and har_rv).
+- **TimesFM 2.5 zero-shot** (`load_pretrained_timesfm()` implemented,
+  `scripts/run_zeroshot_timesfm.py`, same evaluation window): QLIKE 0.248
+  (close to HAR-RV's 0.227), and best of all four models on MSE
+  (1.69e-08), MAE (0.000033), and R² (0.260 — the only meaningfully
+  positive R² among naive/har_rv/garch11/timesfm_zeroshot). This clears
+  the CLAUDE.md §2.3/§4 bar ("if zero-shot can't get near HAR-RV, say so
+  before fine-tuning") — zero-shot is competitive, so fine-tuning work
+  (§5/§6) is justified to attempt next, pending the compute decision
+  still open in §4/§8.
+- **Diebold-Mariano test implemented** (`src/eval/diebold_mariano.py`,
+  `scripts/run_dm_tests.py`, see `reports/dm_test_results.md`) — the QLIKE
+  claims above are now checked, not just point estimates:
+  - HAR-RV beats naive and GARCH(1,1) on QLIKE, and both differences are
+    statistically significant (p=1.4e-05, p≈0) — the "HAR-RV wins" claim
+    holds up.
+  - TimesFM zero-shot beats naive and GARCH(1,1) on QLIKE, both
+    significant (p=2.8e-05, p=5.1e-15).
+  - **HAR-RV vs. TimesFM zero-shot is NOT statistically significant**
+    (p=0.061 at the 5% threshold) — despite TimesFM's better point-estimate
+    R², the two models are statistically indistinguishable on QLIKE. Any
+    claim that either "wins" between these two specifically is unsupported
+    by this test; report both as tied on the primary metric.

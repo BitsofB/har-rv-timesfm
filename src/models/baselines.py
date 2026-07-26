@@ -10,6 +10,8 @@ from dataclasses import dataclass
 import pandas as pd
 from arch import arch_model
 
+from src.models.har_rv import rolling_har_rv
+
 
 @dataclass
 class BaselineResult:
@@ -55,3 +57,36 @@ def rolling_garch_11(
 
     pred_series = pd.Series(dict(preds)).rename("garch_pred")
     return BaselineResult(pred_series)
+
+
+def fit_naive_har_garch(
+    feats: pd.DataFrame,
+    daily_ret: pd.Series,
+    min_train_size: int = 250,
+) -> tuple[pd.Series, dict]:
+    """
+    Shared walk-forward fit for naive/HAR-RV/GARCH(1,1) -- used both by the
+    live-data pipeline (scripts/pull_spy_data.py) and by scripts comparing
+    predictions from cached data (scripts/run_dm_tests.py), so an alignment
+    fix only has to happen in one place.
+
+    feats: the RV/HAR feature table (build_feature_table output), must have
+    an 'rv_d' column. daily_ret: close-to-close daily log returns.
+
+    Returns (target, predictions) where target is RV_{t+1} indexed by day t,
+    and predictions is {"naive": Series, "har_rv": Series, "garch11": Series},
+    all sharing the same "key t = forecast for t+1" index convention.
+    """
+    target = feats["rv_d"].shift(-1).dropna().rename("target")
+    features_aligned = feats.loc[target.index]
+    daily_ret_aligned = daily_ret.loc[daily_ret.index.intersection(target.index)]
+
+    har = rolling_har_rv(features_aligned[["rv_d", "rv_w", "rv_m"]], target, min_train_size)
+    naive = naive_persistence(features_aligned, min_train_size)
+    garch = rolling_garch_11(daily_ret_aligned, min_train_size)
+
+    return target, {
+        "naive": naive.predictions,
+        "har_rv": har.predictions,
+        "garch11": garch.predictions,
+    }

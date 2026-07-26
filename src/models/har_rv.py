@@ -67,11 +67,28 @@ def rolling_har_rv(
     return HARRVResult(pred_series, resid_series, coef_df)
 
 
+def qlike_loss(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
+    """
+    Per-observation QLIKE loss (no averaging) -- the array a Diebold-Mariano
+    test differentiates between two models (src/eval/diebold_mariano.py).
+    Assumes y_true, y_pred are variances (not vol / std), both > 0.
+    Raises rather than silently returning NaN for a non-positive forecast --
+    a model predicting non-positive variance is broken, not a QLIKE edge case.
+    """
+    y_pred = np.asarray(y_pred)
+    if np.any(y_pred <= 0):
+        raise ValueError(
+            "qlike_loss requires strictly positive y_pred (variance forecasts); "
+            f"got {int(np.sum(y_pred <= 0))} non-positive value(s)."
+        )
+    ratio = y_true / y_pred
+    return ratio - np.log(ratio) - 1
+
+
 def qlike(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """
     QLIKE loss — standard evaluation metric for volatility forecasts
     (penalizes underprediction of variance more than squared error does).
     Assumes y_true, y_pred are variances (not vol / std), both > 0.
     """
-    ratio = y_true / y_pred
-    return float(np.mean(ratio - np.log(ratio) - 1))
+    return float(np.mean(qlike_loss(y_true, y_pred)))
