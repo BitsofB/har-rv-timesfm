@@ -13,6 +13,10 @@ data/processed/*
 # Model artifacts
 checkpoints/*
 !checkpoints/.gitkeep
+.claude/
+.goose/
+docs/*
+skills-lock.json
 
 # Python
 __pycache__/
