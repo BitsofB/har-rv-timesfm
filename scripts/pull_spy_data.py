@@ -1,0 +1,75 @@
+"""
+End-to-end pipeline: pull SPY intraday bars, align to the NYSE session
+grid, build RV/HAR features, run all three baselines walk-forward, and
+write reports/baseline_metrics.md.
+
+Requires ALPACA_API_KEY / ALPACA_SECRET_KEY in the environment. Run:
+    python scripts/pull_spy_data.py
+"""
+
+import argparse
+from datetime import datetime
+
+import pandas as pd
+
+from src.eval.baseline_report import compute_baseline_metrics, write_baseline_report
+from src.features.data_alpaca import fetch_intraday_bars
+from src.features.data_cleaning import flag_bad_days, reindex_to_grid, session_grid
+from src.features.realized_vol import build_feature_table, daily_close_returns
+from src.models.baselines import naive_persistence, rolling_garch_11
+from src.models.har_rv import rolling_har_rv
+
+EXPECTED_BARS_PER_DAY = 78  # 6.5h regular session / 5-min bars
+
+
+def main(symbol: str, start: str, end: str, min_train_size: int = 250) -> None:
+    bars = fetch_intraday_bars(
+        symbol, datetime.fromisoformat(start), datetime.fromisoformat(end)
+    )
+
+    grid = session_grid(start, end)
+    reindexed, missing_report = reindex_to_grid(bars, grid)
+    bad_days = flag_bad_days(missing_report, EXPECTED_BARS_PER_DAY)
+    if bad_days:
+        print(f"WARNING: excluding {len(bad_days)} sessions with excessive "
+              f"missing bars: {bad_days}")
+        keep = ~pd.Series(reindexed.index.date, index=reindexed.index).isin(bad_days)
+        reindexed = reindexed[keep]
+
+    reindexed.to_parquet(f"data/raw/{symbol}_5min.parquet")
+
+    prices = reindexed["close"].dropna()
+    feats = build_feature_table(prices)
+    daily_ret = daily_close_returns(prices)
+    feats.to_parquet(f"data/processed/{symbol}_features.parquet")
+
+    target = feats["rv_d"].shift(-1).dropna().rename("target")
+    features_aligned = feats.loc[target.index]
+    daily_ret_aligned = daily_ret.loc[daily_ret.index.intersection(target.index)]
+
+    har = rolling_har_rv(features_aligned[["rv_d", "rv_w", "rv_m"]], target, min_train_size)
+    naive = naive_persistence(features_aligned, min_train_size)
+    garch = rolling_garch_11(daily_ret_aligned, min_train_size)
+
+    common_idx = (
+        har.predictions.index
+        .intersection(naive.predictions.index)
+        .intersection(garch.predictions.index)
+    )
+    metrics = compute_baseline_metrics({
+        "naive": (target.loc[common_idx], naive.predictions.loc[common_idx]),
+        "har_rv": (target.loc[common_idx], har.predictions.loc[common_idx]),
+        "garch11": (target.loc[common_idx], garch.predictions.loc[common_idx]),
+    })
+    write_baseline_report(metrics)
+    print(metrics)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--symbol", default="SPY")
+    parser.add_argument("--start", default="2018-01-01")
+    parser.add_argument("--end", default="2026-07-24")
+    parser.add_argument("--min-train-size", type=int, default=250)
+    args = parser.parse_args()
+    main(args.symbol, args.start, args.end, args.min_train_size)
