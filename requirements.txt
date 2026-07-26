@@ -1,0 +1,24 @@
+# Core
+numpy
+pandas
+scikit-learn
+scipy
+
+# Data sources
+alpaca-py     # primary: free historical intraday minute bars (IEX feed)
+# requests    # optional: Alpha Vantage REST calls (secondary/fundamentals only)
+
+# Volatility baselines
+arch          # GARCH/EGARCH models
+
+# TimesFM 2.5 — https://github.com/google-research/timesfm
+timesfm[torch,xreg]
+peft          # LoRA fine-tuning (official TimesFM fine-tuning path)
+transformers  # required by the HF Transformers + PEFT fine-tuning example
+
+# Eval / stats
+statsmodels   # Diebold-Mariano, ADF/stationarity checks
+
+# Plotting / notebooks
+matplotlib
+jupyter

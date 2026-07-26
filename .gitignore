@@ -1,0 +1,26 @@
+# Secrets — never commit
+.env
+.env.local
+*.pem
+*.key
+
+# Data — regenerable from the API, and potentially licence-restricted
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Model artifacts
+checkpoints/*
+!checkpoints/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
