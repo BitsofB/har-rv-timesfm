@@ -111,11 +111,26 @@ Legend: [ ] not started · [~] in progress · [x] done
       no directional skill on equities (different target — price direction,
       not vol residuals — but keep the zero-shot-vs-fine-tuned ablation
       below mandatory, don't assume fine-tuning helps without checking)
-- [ ] Set up train/val/test split with strict time-ordering (no shuffling
+- [x] Set up train/val/test split with strict time-ordering (no shuffling
       across the boundary) and an embargo gap to prevent leakage through
-      overlapping windows
-- [ ] Decide context length and forecast horizon (align with HAR's own
-      1-day-ahead horizon initially, extend to multi-day later)
+      overlapping windows — `split_with_embargo()` in `src/eval/split.py`,
+      spec + reasoning in `configs/timesfm_finetune_split.md`. Decisions:
+      context_length=128, split 60/20/20, embargo=128 (>= context_length,
+      not a free parameter). SPY worked numbers: train 2021-08-24 to
+      2024-07-31 (n=738), val 2025-02-06 to 2025-07-29 (n=118, captures
+      the April 2025 stress month — highest monthly-mean RV in the whole
+      series), test 2026-02-02 to 2026-07-22 (n=118, mostly calm but has
+      a mini spike ~2026-06-09). Unit-tested (`tests/eval/test_split.py`)
+      against a synthetic series for context-into-train leakage.
+      ⚠️ open: zero-shot baseline was run at context_length=512
+      (`reports/zeroshot_timesfm_metrics.md`) — re-run at 128 before the
+      fine-tuned-vs-zero-shot ablation, save as a separate report file,
+      don't compare across mismatched context lengths.
+      ⚠️ open: val/test land at ~118 sessions each, short of the ~150
+      aspirational floor for a stable DM comparison — revisit if the
+      eventual DM test on the fine-tuned model looks noisy.
+- [x] Decide context length and forecast horizon — context_length=128,
+      horizon=1 (matches HAR's 1-day-ahead target); see split spec above
 - [ ] Add auxiliary covariates as side-channel inputs if supported by the
       TimesFM covariate/regressor interface (jump component, leverage term)
 - [ ] Set up training loop: batch size, learning rate schedule, early
