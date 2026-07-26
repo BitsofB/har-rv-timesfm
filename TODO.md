@@ -12,47 +12,49 @@ Legend: [ ] not started · [~] in progress · [x] done
       — repo: https://github.com/google-research/timesfm
 - [ ] Pin remaining environment details (Python version, CUDA/MPS availability
       for local Mac mini M4 fine-tuning — see open question on compute below)
-- [ ] `requirements.txt` / `pyproject.toml`
-- [ ] Create Alpaca account, generate API key/secret (paper-trading keys work
+- [x] `requirements.txt` / `pyproject.toml`
+- [x] Create Alpaca account, generate API key/secret (paper-trading keys work
       fine for market data access, no funding needed)
-- [ ] Confirm Alpaca free-tier data feed (IEX, not full SIP consolidated tape)
+- [x] Confirm Alpaca free-tier data feed (IEX, not full SIP consolidated tape)
       and note the coverage/quality difference vs. paid SIP feed
 
 ## 1. Data acquisition & cleaning
-- [ ] Pull intraday minute-bar data for target asset(s) via Alpaca (start with
+- [x] Pull intraday minute-bar data for target asset(s) via Alpaca (start with
       1 liquid equity index ETF or large-cap name before multi-asset)
-- [ ] Handle exchange calendar / trading-hours filtering, holidays, half-days
-- [ ] Clean microstructure noise (bad ticks, crossed quotes, outliers) — IEX
-      feed is a single venue so likely cleaner than consolidated tape, but
-      still check for gaps/stale bars
-- [ ] Resample to fixed intraday grid (e.g. 5-min) for RV estimation
-- [ ] Store cleaned intraday data in `data/raw/`
+- [x] Handle exchange calendar / trading-hours filtering, holidays, half-days
+- [x] Detect gaps/missing bars via the session grid (`flag_bad_days` /
+      `reindex_to_grid` in `src/features/data_cleaning.py`) — NOTE: this is
+      gap detection only. Bad-tick / crossed-quote / outlier detection is
+      NOT implemented anywhere in `src/` and remains a gap; IEX being a
+      single venue makes this lower-priority but it's still unaddressed.
+- [x] Resample to fixed intraday grid (e.g. 5-min) for RV estimation
+- [x] Store cleaned intraday data in `data/raw/`
 - [ ] (Optional) Pull Alpha Vantage fundamentals/economic-indicator data as
       auxiliary covariates — separate from the core price pipeline
 
 ## 2. Realized volatility feature engineering (`src/features/`)
-- [ ] Compute daily realized variance (sum of squared 5-min returns)
-- [ ] Compute realized volatility (sqrt of RV), and log(RV) for modeling
-- [ ] Compute bipower variation (BV) for jump-robust volatility
-- [ ] Compute jump component: `J_t = max(RV_t - BV_t, 0)`
-- [ ] Compute realized signed semi-variance (upside/downside split)
-- [ ] Compute HAR lag features: RV_t (daily), avg(RV_{t-5:t}) (weekly),
+- [x] Compute daily realized variance (sum of squared 5-min returns)
+- [x] Compute realized volatility (sqrt of RV), and log(RV) for modeling
+- [x] Compute bipower variation (BV) for jump-robust volatility
+- [x] Compute jump component: `J_t = max(RV_t - BV_t, 0)`
+- [x] Compute realized signed semi-variance (upside/downside split)
+- [x] Compute HAR lag features: RV_t (daily), avg(RV_{t-5:t}) (weekly),
       avg(RV_{t-22:t}) (monthly)
 - [ ] Optional covariates: overnight return, leverage term, implied vol
       (VIX-equivalent) if available, volume/turnover
-- [ ] Save processed feature table to `data/processed/`
-- [ ] Sanity-check for look-ahead leakage (every feature at time t must only
+- [x] Save processed feature table to `data/processed/`
+- [x] Sanity-check for look-ahead leakage (every feature at time t must only
       use information available up to t)
 
 ## 3. Baseline models (`src/models/`)
-- [ ] Implement HAR-RV (OLS) — this is the anchor/base model
+- [x] Implement HAR-RV (OLS) — this is the anchor/base model
 - [ ] Implement HAR-RV variants for comparison: HAR-J (with jumps),
       HAR-RS (with signed semi-variance) — optional stretch
-- [ ] Implement GARCH(1,1) / EGARCH baseline on daily returns
-- [ ] Implement naive persistence baseline (RV_{t+1} = RV_t)
-- [ ] Rolling/expanding-window re-estimation scheme for all baselines
+- [x] Implement GARCH(1,1) / EGARCH baseline on daily returns
+- [x] Implement naive persistence baseline (RV_{t+1} = RV_t)
+- [x] Rolling/expanding-window re-estimation scheme for all baselines
       (avoid full-sample refit leakage)
-- [ ] Log baseline out-of-sample metrics (QLIKE, MSE, MAE, R²) to
+- [x] Log baseline out-of-sample metrics (QLIKE, MSE, MAE, R²) to
       `reports/baseline_metrics.md`
 
 ## 4. TimesFM integration — zero-shot pass first
@@ -134,4 +136,19 @@ Legend: [ ] not started · [~] in progress · [x] done
 ## Immediate next actions
 1. Pick target asset + confirm intraday data source
 2. Build RV + HAR feature pipeline (steps 1–2)
-3. Get HAR-RV baseline numbers before touching TimesFM at all
+3. Get HAR-RV baseline numbers before touching TimesFM at all — **done**,
+   see `reports/baseline_metrics.md` (SPY, `scripts/pull_spy_data.py`)
+
+## Note (2026-07-25, Task 6 end-to-end run)
+- Alpha Vantage auxiliary-data pull (§0/§1 optional bullets) remains
+  unchecked — out of scope for the baseline pipeline plan.
+- HAR-J / HAR-RS stretch variants (§3) remain unchecked — explicitly optional.
+- **Data coverage gap found and worth tracking**: fetching SPY 5-min bars for
+  2018-01-01..2026-07-24 from Alpaca's free/IEX feed returned unusable
+  (>5% missing) sessions for effectively the entire 2018-01-02 through
+  2020-07-24 window (649 sessions excluded by `flag_bad_days`), so the
+  baseline numbers in `reports/baseline_metrics.md` are computed on
+  ~2020-07-27 onward only, not the full requested 8+ year history. Revisit
+  if a longer backtest window (e.g. for the 2020 COVID stress-window
+  ablation in CLAUDE.md §6) is needed — may require a different data
+  source/tier for the pre-2020-07 period.

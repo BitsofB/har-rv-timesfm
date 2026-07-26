@@ -54,13 +54,13 @@ def fetch_intraday_bars(
     worth keeping in mind when interpreting realized volatility magnitudes.
     """
     from alpaca.data.requests import StockBarsRequest
-    from alpaca.data.timeframe import TimeFrame
+    from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
     client = _get_client()
 
     request = StockBarsRequest(
         symbol_or_symbols=symbol,
-        timeframe=TimeFrame(timeframe_minutes, TimeFrame.Unit.Minute),
+        timeframe=TimeFrame(timeframe_minutes, TimeFrameUnit.Minute),
         start=start,
         end=end,
         feed=feed,

@@ -3,10 +3,17 @@ numpy
 pandas
 scikit-learn
 scipy
+pyarrow       # parquet read/write engine for pandas
+
+# Testing
+pytest
 
 # Data sources
 alpaca-py     # primary: free historical intraday minute bars (IEX feed)
 # requests    # optional: Alpha Vantage REST calls (secondary/fundamentals only)
+
+# Calendar alignment
+pandas-market-calendars
 
 # Volatility baselines
 arch          # GARCH/EGARCH models
@@ -18,6 +25,9 @@ transformers  # required by the HF Transformers + PEFT fine-tuning example
 
 # Eval / stats
 statsmodels   # Diebold-Mariano, ADF/stationarity checks
+
+# Markdown table export
+tabulate
 
 # Plotting / notebooks
 matplotlib

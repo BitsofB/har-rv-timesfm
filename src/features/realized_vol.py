@@ -12,8 +12,15 @@ import pandas as pd
 
 
 def intraday_log_returns(prices: pd.Series) -> pd.Series:
-    """Log returns within a trading day at the resampled grid frequency."""
-    return np.log(prices).diff().dropna()
+    """Log returns within a trading day at the resampled grid frequency.
+
+    Diffs are taken per-session (grouped by calendar date) so the first
+    return of each trading day is dropped rather than computed against the
+    previous session's last price -- that cross-session diff is an overnight
+    return, not an intraday one, and squaring it into RV would contaminate
+    the target with overnight gap variance.
+    """
+    return np.log(prices).groupby(prices.index.date).diff().dropna()
 
 
 def daily_realized_variance(intraday_returns: pd.Series) -> pd.Series:
@@ -27,13 +34,33 @@ def daily_bipower_variation(intraday_returns: pd.Series) -> pd.Series:
     BV_t = (pi/2) * sum(|r_i| * |r_{i-1}|)
     """
     abs_r = intraday_returns.abs()
-    prod = abs_r * abs_r.shift(1)
+    prod = abs_r * abs_r.groupby(intraday_returns.index.date).shift(1)
     return (np.pi / 2) * prod.groupby(intraday_returns.index.date).sum()
 
 
 def jump_component(rv: pd.Series, bv: pd.Series) -> pd.Series:
     """J_t = max(RV_t - BV_t, 0)."""
     return (rv - bv).clip(lower=0)
+
+
+def daily_signed_semivariance(intraday_returns: pd.Series) -> pd.DataFrame:
+    """
+    Split RV into upside/downside components (Barndorff-Nielsen, Kinnebrock
+    & Shephard 2010): RV_t = RV_pos_t + RV_neg_t.
+    """
+    pos = intraday_returns.clip(lower=0).pow(2)
+    neg = intraday_returns.clip(upper=0).pow(2)
+    return pd.DataFrame({
+        "rv_pos": pos.groupby(intraday_returns.index.date).sum(),
+        "rv_neg": neg.groupby(intraday_returns.index.date).sum(),
+    })
+
+
+def daily_close_returns(prices: pd.Series) -> pd.Series:
+    """Close-to-close daily log returns (for GARCH, not RV)."""
+    daily_close = prices.groupby(prices.index.date).last()
+    daily_close.index = pd.to_datetime(daily_close.index)
+    return np.log(daily_close).diff().dropna()
 
 
 def har_lag_features(rv: pd.Series) -> pd.DataFrame:
